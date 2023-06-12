@@ -30,7 +30,7 @@ matrc=matr[,cs]     #第二次筛除细胞基因低记录/高记录基因
 #write.csv(cb,"cb.csv")
 #write.csv(names,"names.csv")
 
-#降维分析，注意不同分析方法消耗计算机内存消耗不一致
+#降维分析，注意不同分析方法消耗计算机内存消耗不一致（推荐UMAP速度较快，tsne需要填写参数）
 library(umap)              #library(tsne)
 pm=umap(t(matrc))    #pm=tsne(t(matrc)) 
 
@@ -81,3 +81,5 @@ scale_fill_manual(values =sample(cbp,length(levels(factor(pdata$class))),replace
 theme(legend.title=element_text(face ="bold"))+
 theme(axis.text.x=element_text(face ="bold"),axis.title=element_text(face ="bold"))
 main}
+
+#单细胞测序结果分析关键步骤：细胞和基因筛除参数需要调整，同时也为后续降维分析所需计算机内存减压；后续分析根据需求变动，细胞轨迹可根据理论或不同时期样本标注参考分析，同时分类过程需要研究者确切了解亚细胞群体标志性基因markers，同时也有助于新类型细胞筛选；
