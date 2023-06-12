@@ -1,0 +1,83 @@
+#自己常用配色
+cbp=c("#ed1299","#09f9f5","#246b93","#cc8e12","#d561dd","#c93f00","#ddd53e",
+"#4aef7b","#e86502","#9ed84e","#39ba30","#6ad157","#8249aa","#99db27","#e07233",
+"#ff523f","#ce2523","#f7aa5d","#cebb10","#03827f","#931635","#373bbf","#a1ce4c",
+"#ef3bb6","#d66551","#1a918f","#ff66fc","#2927c4","#7149af","#57e559","#8e3af4",
+"#f9a270","#22547f","#db5e92","#edd05e","#6f25e8","#0dbc21","#280f7a","#6373ed",
+"#5b910f","#7b34c1","#0cf29a","#d80fc1","#dd27ce","#07a301","#167275","#391c82",
+"#2baeb5","#925bea","#63ff4f")
+
+#稀疏矩阵载入
+library(Matrix)
+mtx=readMM("matrix.mtx")
+
+mat=as.matrix(mtx)        #矩阵转换，内存消耗较大，推荐32G运行内存
+rsum=apply(mat,1,sum)  #数据筛选变量参数，此处为每微球基因记录总量
+
+names=read.csv("features.tsv",sep="\t",header=FALSE)  #基因注释
+cb=read.csv("barcodes.tsv",sep="\t",header=FALSE)    #细胞小球注释
+
+rs=which(rsum>=mean(rsum))    #筛选参数可变换，注意所关注的基因可能丢失，参数需调整
+names=names[rs,]                      #记录基因注释表
+matr=mat[rs,]                             #第一次筛除低表达基因
+csum=apply(matr,2,sum)             #数据筛选变量参数，此处为每基因总记录数
+cs=which(csum>=mean(csum))   #筛选参数可变换，参数需调整
+cb=cb[cs,]              #记录小球表
+matrc=matr[,cs]     #第二次筛除细胞基因低记录/高记录基因
+
+#文件预保存
+#write.csv(matrc,"matrc.csv")
+#write.csv(cb,"cb.csv")
+#write.csv(names,"names.csv")
+
+#降维分析，注意不同分析方法消耗计算机内存消耗不一致
+library(umap)              #library(tsne)
+pm=umap(t(matrc))    #pm=tsne(t(matrc)) 
+
+pxy=pm$layout #降维散点图数据生成
+library(ggplot2)
+#ggplot()+geom_point(aes(x=pxy[,1],y=pxy[,2])) #简单观察
+
+
+#umf函数用于生成细胞分类图
+umf=function(pxy,n=15){
+class=kmeans(pxy,n,20,15)$cluster   #可更改分类方法
+pdata=data.frame(umap1=pxy[,1],umap2=pxy[,2],class=as.factor(class))
+library(dplyr)
+label_data=pdata %>%
+group_by(class) %>%
+summarize(x_center = mean(umap1), y_center = mean(umap2), labels = paste(as.factor(class), collapse = "\n"))
+main=ggplot(pdata)+geom_point(aes(x=umap1,y=umap2,col=class))+scale_color_manual(values =sample(cbp,length(levels(factor(pdata$class))),replace=F))+geom_text(data = label_data, aes(x = x_center, y = y_center, label = class), vjust = -1)+theme(legend.title=element_text(face ="bold"))+
+theme(axis.text.x=element_text(face ="bold"),axis.title=element_text(face ="bold"))
+main}
+
+#ump函数用于生成细胞分类基因表达情况图
+ump=function(pxy,name="GAPDH", n=15){
+assign(name,matrc[which(names[,2]==name),])
+exp=get(name)
+mexp=mean(exp)
+pdata=data.frame(umap1=pxy[,1],umap2=pxy[,2],exp=exp/mexp)
+main=ggplot(pdata)+geom_point(aes(x=umap1,y=umap2,col=exp))+
+scale_color_gradientn(colors = c("green4", "black", "red2"), name = paste(name,"Expression"))+
+theme(legend.title=element_text(face ="bold"))+
+theme(axis.text.x=element_text(face ="bold"),axis.title=element_text(face ="bold"))+
+theme(legend.title=element_text(face ="bold"),legend.text=element_text(face ="bold"))
+main
+}
+
+#barg函数用于生成不同分类基因表达情况柱状图
+barg=function(name="GAPDH",n=15){
+class=kmeans(pxy,n,20,15)$cluster   #class=kmeans(pxy,15)$cluster 
+assign(name,matrc[which(names[,2]==name),])
+pdata=data.frame(x=get(name),class=as.factor(class))
+barsd=aggregate(x~ class , data = pdata, FUN = function(x) c(mean = mean(x), sd = sd(x)))
+barsd=data.frame(class=barsd[,1],mean=as.data.frame(barsd[,2])[,1],sd=as.data.frame(barsd[,2])[,2])
+prang=barsd$mean+barsd$sd
+orang=barsd$mean-barsd$sd
+main= ggplot()+geom_jitter(aes(pdata$class,pdata$x))+
+geom_bar(aes(x=barsd$class,y=barsd$mean,fill=barsd$class), stat = "identity")+
+geom_errorbar(aes(x=barsd$class,y=barsd$mean,ymin =orang, ymax =prang),col="black",size = 1)+
+scale_fill_manual(values =sample(cbp,length(levels(factor(pdata$class))),replace=F))+
+theme(legend.title=element_text(face ="bold"))+
+theme(axis.text.x=element_text(face ="bold"),axis.title=element_text(face ="bold"))
+main}
